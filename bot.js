@@ -1,11 +1,13 @@
 const discord = require("discord.js");
 const fs = require("fs");
 const config = require("./config.json");
+const database = require('better-sqlite3');
 
 let client = new discord.Client();
-let structures = {};
-let commands = {};
-let data;
+client.structures = new discord.Collection();
+client.commands = new discord.Collection();
+//let data;
+let db = new database("bot.db");
 
 let structurePromise = new Promise((resolve, reject) => {
   fs.readdir("./structures", (error, structureFiles) => {
@@ -22,7 +24,7 @@ let structurePromise = new Promise((resolve, reject) => {
         if(error) {
           console.log(error);
         } else {
-          structures[file.replace(".json", "")] = JSON.parse(data);
+          client.structures.set(file.replace(".json", ""), JSON.parse(data));
         }
       })
     }
@@ -46,7 +48,7 @@ let commandPromise = new Promise((resolve, reject) => {
   value.forEach((file, index) => {
     if(file.endsWith(".js")) {
       let command = require(`./commands/${file}`);
-      commands[command.name] = command;
+      client.commands.set(command.name, command)
     }
   });}, (error) => {
   if(error) {
@@ -54,35 +56,41 @@ let commandPromise = new Promise((resolve, reject) => {
   }
 })
 
+/*
 let dataPromise =  new Promise((resolve, reject) => {loadData(resolve, reject)}).then((value) => {
   data = value;
   setInterval(() => {saveData()}, 2000);
 }, (error) => {
   throw error;
 })
+*/
 
-Promise.all([structurePromise, commandPromise, dataPromise]).then(() => {client.login(config.token);})
+Promise.all([structurePromise, commandPromise]).then(() => {client.login(config.token);})
 
 client.on("ready", () => {
   console.log("Connected");
 })
 
-function saveData() {
-  fs.writeFile("data.json", JSON.stringify(data), (error) => {
-    if(error) {
-      console.log(error);
-    } else {
-      console.log(`Data saved at ${new Date().toISOString()}`);
-    }
-  })
+client.on("message", (message) => {
+  parseMessage(message)});
+
+function addGuild(guild) {
+  let stmt = db.prepare("INSERT INTO guilds (id, prefix) VALUES (?, @prefix)");
+  stmt.run(guild.id, client.structures.get("guild"))
 }
 
-function loadData(resolve, reject) {
-  fs.readFile("data.json", (error, data) => {
-    if(error) {
-      reject(error);
-    } else {
-      resolve(JSON.parse(data.toString()));
+function addUser(user) {
+  let stmt = dp.prepare("INSERT INTO users (id) VALUES (?)");
+  stmt.run(user.id)
+}
+
+function parseMessage(message) {
+  let {prefix} = db.prepare("SELECT prefix FROM guilds WHERE id = ?").all(message.guild.id);
+  console.log(prefix);
+  if(message.content.indexOf(db.prepare("SELECT prefix FROM guilds WHERE id = ?").get(message.guild.id).prefix) == 0) {
+    let command = message.content.split(" ");
+    if(client.commands.has(command[1])) {
+      client.commands.get(command[1]).execute(message, command.splice(2));
     }
-  })
+  }
 }
