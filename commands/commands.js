@@ -5,6 +5,7 @@ module.exports = {
   syntax: [],
   description: "Shows you some of ServerStocks commands!",
   adminPerm: false,
+  minargs: 0,
   execute(message, args) {
     let embed = message.client.embed;
     embed.setTitle(message.client.formatTitle(this.name));

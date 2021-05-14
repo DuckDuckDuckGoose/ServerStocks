@@ -5,6 +5,7 @@ module.exports = {
   syntax: [],
   description: "Explains some of ServerStocks features!",
   adminPerm: false,
+  minargs: 0,
   execute(message, args) {
     message.channel.send(message.client.embed
       .setTitle(message.client.formatTitle(this.name))

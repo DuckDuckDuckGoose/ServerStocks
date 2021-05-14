@@ -72,8 +72,8 @@ function addGuild(message) {
 }
 
 function addUser(message) {
-  let stmt = client.db.prepare("INSERT INTO users (id, guildid) VALUES (@id, @id)");
-  stmt.run(message.client, message.guild)
+  let stmt = client.db.prepare("INSERT INTO users (id, guildid) VALUES (?, ?)");
+  stmt.run(message.author.id, message.guild.id)
 }
 
 function updateUser(message) {
@@ -102,7 +102,8 @@ function parseMessage(message) {
       let args = message.content.toLowerCase().split(" ");
       command = client.commands.findKey((cmd) => cmd.name == args[1] || cmd.aliases.includes(args[1]));
       if(!command) {return;}
-      if(client.commands.get(command).adminPerm == true && message.member.hasPermission("ADMINISTRATOR", true, true) == false) {return;}
+      if(client.commands.get(command).adminPerm == true && message.member.hasPermission("ADMINISTRATOR", true, true) == false) {message.channel.send("Invalid Perm");return;}
+      if(client.commands.get(command).minargs > args.length - 2) {message.channel.send("Invalid Syntax");return;}
       checkUser(message);
       client.commands.get(command).execute(message, args.splice(2));
     }
