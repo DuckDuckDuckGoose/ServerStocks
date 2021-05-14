@@ -1,13 +1,20 @@
 const discord = require("discord.js");
 const fs = require("fs");
-const config = require("./config.json");
 const database = require('better-sqlite3');
+const dotenv = require("dotenv");
+dotenv.config();
 
 let client = new discord.Client();
+client.embed = new discord.MessageEmbed().setColor("DARK_GREEN");
+client.formatTitle = (str) => {
+  return "ServerStocks -> " + str.charAt(0).toUpperCase() + str.slice(1);
+}
+client.capitalise = (str) => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 client.structures = new discord.Collection();
 client.commands = new discord.Collection();
-//let data;
-let db = new database("bot.db");
+client.db = new database("bot.db");
 
 let structurePromise = new Promise((resolve, reject) => {
   fs.readdir("./structures", (error, structureFiles) => {
@@ -19,14 +26,9 @@ let structurePromise = new Promise((resolve, reject) => {
   })
 }).then((value) => {
   value.forEach((file, index) => {
-    if(file.endsWith(".json")) {
-      fs.readFile(`./structures/` + file.toString(), (error, data) => {
-        if(error) {
-          console.log(error);
-        } else {
-          client.structures.set(file.replace(".json", ""), JSON.parse(data));
-        }
-      })
+    if(file.endsWith(".js")) {
+      let structure = require(`./structures/${file}`);
+      client.structures.set(structure.name, structure);
     }
   });
 
@@ -48,7 +50,7 @@ let commandPromise = new Promise((resolve, reject) => {
   value.forEach((file, index) => {
     if(file.endsWith(".js")) {
       let command = require(`./commands/${file}`);
-      client.commands.set(command.name, command)
+      client.commands.set(command.name, command);
     }
   });}, (error) => {
   if(error) {
@@ -56,41 +58,68 @@ let commandPromise = new Promise((resolve, reject) => {
   }
 })
 
-/*
-let dataPromise =  new Promise((resolve, reject) => {loadData(resolve, reject)}).then((value) => {
-  data = value;
-  setInterval(() => {saveData()}, 2000);
-}, (error) => {
-  throw error;
-})
-*/
-
-Promise.all([structurePromise, commandPromise]).then(() => {client.login(config.token);})
+Promise.all([structurePromise, commandPromise]).then(() => {client.login(process.env.TOKEN);})
 
 client.on("ready", () => {
   console.log("Connected");
 })
 
-client.on("message", (message) => {
-  parseMessage(message)});
+client.on("message", (message) => {parseMessage(message);});
 
-function addGuild(guild) {
-  let stmt = db.prepare("INSERT INTO guilds (id, prefix) VALUES (?, @prefix)");
-  stmt.run(guild.id, client.structures.get("guild"))
+function addGuild(message) {
+  let stmt = client.db.prepare("INSERT INTO guilds (id, prefix) VALUES (?, @prefix)");
+  stmt.run(message.guild, client.structures.get("guild"))
 }
 
-function addUser(user) {
-  let stmt = dp.prepare("INSERT INTO users (id) VALUES (?)");
-  stmt.run(user.id)
+function addUser(message) {
+  let stmt = client.db.prepare("INSERT INTO users (id, guildid) VALUES (@id, @id)");
+  stmt.run(message.client, message.guild)
+}
+
+function updateUser(message) {
+  let row = client.db.prepare("SELECT * FROM users WHERE id = ?").get(message.author.id);
+  Object.entries(row).forEach((kv) => {
+    if(kv[1] == null) {
+      client.db.prepare(`UPDATE users SET ${kv[0]} = ${client.structures.get("user")[kv[0]](message)} WHERE id = ${message.author.id}`).run();
+    }
+  });
+}
+
+function updateGuild(message) {
+  let row = client.db.prepare("SELECT * FROM guild WHERE id = ?").get(message.guild.id);
+  Object.entries(row).forEach((kv) => {
+    if(kv[1] == null) {
+      client.db.prepare(`UPDATE guild SET ${kv[0]} = ${client.structures.get("guild")[kv[0]](message)} WHERE id = ${message.guild.id}`).run();
+    }
+  });
 }
 
 function parseMessage(message) {
-  let {prefix} = db.prepare("SELECT prefix FROM guilds WHERE id = ?").all(message.guild.id);
-  console.log(prefix);
-  if(message.content.indexOf(db.prepare("SELECT prefix FROM guilds WHERE id = ?").get(message.guild.id).prefix) == 0) {
-    let command = message.content.split(" ");
-    if(client.commands.has(command[1])) {
-      client.commands.get(command[1]).execute(message, command.splice(2));
+  if(!message.author.bot) {
+    checkGuild(message);
+    let {prefix} = client.db.prepare("SELECT prefix FROM guilds WHERE id = ?").get(message.guild.id);
+    if(message.content.startsWith(prefix + " ")) {
+      let args = message.content.toLowerCase().split(" ");
+      command = client.commands.findKey((cmd) => cmd.name == args[1] || cmd.aliases.includes(args[1]));
+      if(!command) {return;}
+      if(client.commands.get(command).adminPerm == true && message.member.hasPermission("ADMINISTRATOR", true, true) == false) {return;}
+      checkUser(message);
+      client.commands.get(command).execute(message, args.splice(2));
     }
+  }
+}
+
+function checkGuild(message) {
+  if(client.db.prepare("SELECT * FROM guilds WHERE id = ?").get(message.guild.id) == undefined) {
+    addGuild(message);
+  }
+}
+
+function checkUser(message) {
+  let row = client.db.prepare("SELECT * FROM users WHERE id = ?").get(message.author.id);
+  if(row == undefined) {
+    addUser(message);
+  } else if(Object.values(row).some((value) => {return value == null})) {
+    updateUser(message);
   }
 }
