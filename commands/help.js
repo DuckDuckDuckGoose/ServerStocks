@@ -6,6 +6,10 @@ module.exports = {
   description: "Provides helps with commands and syntax!",
   adminPerm: false,
   minargs: 0,
+  guildTimeoutTime: 1,
+  userTimeoutTime: 10,
+  guildTimeouts: [],
+  userTimeouts: [],
   execute(message, args) {
     if(args.length > 0) {
       command = message.client.commands.findKey((cmd) => cmd.name == args[0] || cmd.aliases.includes(args[0]));

@@ -6,13 +6,15 @@ module.exports = {
   description: "Shows you some of ServerStocks commands!",
   adminPerm: false,
   minargs: 0,
+  guildTimeoutTime: 1,
+  userTimeoutTime: 10,
+  guildTimeouts: [],
+  userTimeouts: [],
   execute(message, args) {
-    let embed = message.client.embed;
-    embed.setTitle(message.client.formatTitle(this.name));
+    let embedFields =[];
     message.client.commands.forEach((command) => {
-      embed.addField("Command -> " + message.client.capitalise(command.name), command.description)
+      embedFields.push({"name": command.name, "value": command.description, "inline": false});
     });
-    message.channel.send(embed);
-
+    message.client.embedReply(message, embedFields, this);
   },
 };

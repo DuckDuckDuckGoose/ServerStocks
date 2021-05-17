@@ -1,16 +1,16 @@
 const discord = require("discord.js");
 module.exports = {
-  name: "ping",
-  aliases: ["latency", "delay", "alive", "performance"],
+  name: "status",
+  aliases: ["marketstate"],
   syntax: [],
-  description: "Shows latency and ping of ServerStocks",
+  description: "Shows the market state",
   adminPerm: false,
-  minargs: 0,
+  minargs: 2,
   guildTimeoutTime: 1,
   userTimeoutTime: 10,
   guildTimeouts: [],
   userTimeouts: [],
   execute(message, args) {
-    message.channel.send(`Ping: ${message.client.ws.ping}`);
+    let [item1, item2] = args;
   },
 };
